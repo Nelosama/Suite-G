@@ -11,7 +11,9 @@ import androidx.room.RoomDatabase
         SetlistE::class, SetlistItemE::class, TrazoE::class, GrabacionE::class, MarcaGrabacionE::class,
     ],
     version = 1,
-    exportSchema = true,
+    // Sin exportar: las variantes debug y release escriben a la vez el mismo archivo y Room falla con
+    // "Empty schema file". Al añadir la primera migración, activar el plugin de Gradle de Room (esquemas por variante).
+    exportSchema = false,
 )
 abstract class BaseDatos : RoomDatabase() {
     abstract fun documentos(): DocumentoDao
