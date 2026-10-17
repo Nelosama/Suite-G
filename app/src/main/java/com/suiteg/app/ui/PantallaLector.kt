@@ -383,7 +383,7 @@ private fun DialogoConfigTempo(sesion: SesionLectura, alCerrar: () -> Unit) {
 private fun Campo(etiqueta: String, valor: String, modifier: Modifier = Modifier.fillMaxWidth(), alCambiar: (String) -> Unit) {
     androidx.compose.material3.OutlinedTextField(
         value = valor, onValueChange = alCambiar, label = { Text(etiqueta) }, singleLine = true, modifier = modifier,
-        shape = androidx.compose.foundation.shape.RectangleShape,
+        shape = androidx.compose.ui.graphics.RectangleShape,
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
     )
 }
