@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Suite-G</string>
+    <string name="canal_grabacion">Grabación</string>
+    <string name="notificacion_grabando">Grabando…</string>
+    <string name="notificacion_grabando_detalle">La grabación sigue activa. Ábrela para detenerla.</string>
+</resources>

@@ -74,6 +74,35 @@ data class TransformacionVista(
             )
         }
 
+        /**
+         * Como [ajustar], pero con el origen (en píxeles de la página escalada) elegido por el usuario al hacer
+         * zoom o desplazarse. El origen se limita a los bordes de la página. Con [zoom] = 1 y ajuste de página
+         * completa equivale a la vista centrada.
+         */
+        fun ajustarConOrigen(
+            anchoPaginaPt: Float,
+            altoPaginaPt: Float,
+            anchoVentana: Float,
+            altoVentana: Float,
+            ajuste: AjusteVista,
+            zoom: Float,
+            origenX: Float,
+            origenY: Float,
+        ): TransformacionVista {
+            require(anchoPaginaPt > 0 && altoPaginaPt > 0) { "Tamaño de página inválido" }
+            require(anchoVentana > 0 && altoVentana > 0) { "Tamaño de ventana inválido" }
+            val base = when (ajuste) {
+                AjusteVista.PAGINA_COMPLETA -> min(anchoVentana / anchoPaginaPt, altoVentana / altoPaginaPt)
+                AjusteVista.ANCHO -> anchoVentana / anchoPaginaPt
+            }
+            val escala = base * zoom.coerceIn(1f, ZOOM_MAXIMO)
+            return TransformacionVista(
+                anchoPaginaPt, altoPaginaPt, escala,
+                origenEje(anchoPaginaPt * escala, anchoVentana, origenX),
+                origenEje(altoPaginaPt * escala, altoVentana, origenY),
+            )
+        }
+
         /** Centra si la página cabe en la ventana; si no, limita el origen a los bordes de la página. */
         private fun origenEje(tamPagina: Float, tamVentana: Float, deseado: Float): Float =
             if (tamPagina <= tamVentana) 0.5f * (tamPagina - tamVentana)

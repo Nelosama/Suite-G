@@ -53,4 +53,18 @@ class TransformacionVistaTest {
         val t = TransformacionVista.ajustar(100f, 100f, 100f, 100f, AjusteVista.ANCHO, zoom = 99f)
         assertEquals(TransformacionVista.ZOOM_MAXIMO, t.escala / 1f, eps)
     }
+
+    @Test
+    fun `ajustar con origen limita el origen a los bordes`() {
+        val t = TransformacionVista.ajustarConOrigen(100f, 400f, 200f, 200f, AjusteVista.ANCHO, 1f, origenX = -50f, origenY = 9999f)
+        assertEquals(0f, t.origenX, eps) // la página escalada (200) coincide con la ventana: sin desplazamiento horizontal
+        assertEquals(600f, t.origenY, eps) // 800 - 200
+    }
+
+    @Test
+    fun `ajustar con origen centra si la pagina cabe`() {
+        val t = TransformacionVista.ajustarConOrigen(100f, 200f, 400f, 400f, AjusteVista.PAGINA_COMPLETA, 1f, origenX = 500f, origenY = 500f)
+        assertEquals(-100f, t.origenX, eps) // (200 - 400) / 2
+        assertEquals(0f, t.origenY, eps)
+    }
 }

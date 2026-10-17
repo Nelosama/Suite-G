@@ -239,3 +239,39 @@ class MotorTempoTest {
         assertIs<Double>(i.bpmEfectivo)
     }
 }
+
+class SesionLargaTempoTest {
+    @Test
+    fun `una pieza de dos horas avisa y gira en cada vista y termina sola`() {
+        val reloj = RelojManual(0)
+        val eventos = mutableListOf<EventoTempo>()
+        val motor = MotorTempo(reloj) { eventos += it }
+        // 120 vistas de 1 minuto (60 bpm, 1 pulso por compás, 60 compases)
+        val sec = SecuenciaDeVistas.construir(120, emptyList())
+        val plan = (CalculadorTempo.calcular(sec, ParametrosPlan(60.0, 1, 60)) as ResultadoPlan.Listo).plan
+        motor.configurar(plan)
+        motor.iniciar(0)
+
+        // Ticks cada 50 ms durante algo más de dos horas; dos pausas de la persona en medio
+        var t = 0L
+        while (t < 2 * 3600_000L + 300_000L) { // + la pausa de 60 s y margen
+            reloj.avanzar(50); t += 50
+            motor.tick()
+            if (t == 1_000_000L) motor.pausar()
+            if (t == 1_060_000L) motor.reanudar()
+        }
+        assertEquals(EstadoTempo.FINALIZADO, motor.estado)
+        assertEquals(119, eventos.count { it is EventoTempo.Girar })
+        assertEquals(120, eventos.count { it is EventoTempo.AvisoGiro })
+        assertEquals(1, eventos.count { it == EventoTempo.Fin })
+        // El giro siempre es precedido por su aviso
+        var avisado = false
+        for (e in eventos) {
+            when (e) {
+                is EventoTempo.AvisoGiro -> avisado = true
+                is EventoTempo.Girar, EventoTempo.Fin -> { assertTrue(avisado); avisado = false }
+                else -> Unit
+            }
+        }
+    }
+}

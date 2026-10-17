@@ -26,6 +26,8 @@ enum class Accion(val etiqueta: String) {
     SIGUIENTE_CANCION("Siguiente canción"),
     CANCION_ANTERIOR("Canción anterior"),
     REPETIR_SECCION("Repetir sección"),
+    MARCADOR_SIGUIENTE("Ir al marcador siguiente"),
+    MARCADOR_ANTERIOR("Ir al marcador anterior"),
     TEMPO_INICIAR_PAUSAR("Tempo: iniciar / pausar"),
     TEMPO_MAS_RAPIDO("Tempo: más rápido"),
     TEMPO_MAS_LENTO("Tempo: más lento"),

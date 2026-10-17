@@ -64,8 +64,6 @@ data class ConfigTempoCancion(
     val modo: ModoAvance = ModoAvance.PAGINA,
     /** Compases de cuenta de entrada antes de arrancar (0 = sin cuenta). */
     val cuentaEntradaCompases: Int = 0,
-    /** Vista desde la que arranca el avance. */
-    val vistaInicial: Int = 0,
 )
 
 enum class EstadoDocumento { OK, DANADO, FALTANTE }

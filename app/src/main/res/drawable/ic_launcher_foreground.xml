@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Corchea geométrica, sin curvas: cabeza cuadrada, plica y corchete. -->
+    <path android:fillColor="#FFC4501F" android:pathData="M36,64h20v14H36z" />
+    <path android:fillColor="#FFC4501F" android:pathData="M54,30h5v48h-5z" />
+    <path android:fillColor="#FFC4501F" android:pathData="M59,30h16v8L59,50z" />
+</vector>
