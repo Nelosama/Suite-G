@@ -1,6 +1,6 @@
 package com.suiteg.app.ui
 
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /** Paleta utilitaria: fondos carbón y un único acento óxido. */
@@ -46,10 +47,9 @@ private val Esquema = darkColorScheme(
 )
 
 // Sin esquinas redondeadas en ningún componente.
-private val SinEsquinas = Shapes(
-    extraSmall = RectangleShape, small = RectangleShape, medium = RectangleShape,
-    large = RectangleShape, extraLarge = RectangleShape,
-)
+// Material 3 exige formas con esquinas; con radio 0 son rectángulos puros.
+private val Recta = RoundedCornerShape(0.dp)
+private val SinEsquinas = Shapes(extraSmall = Recta, small = Recta, medium = Recta, large = Recta, extraLarge = Recta)
 
 private val Tipografia = Typography(
     headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 26.sp),
