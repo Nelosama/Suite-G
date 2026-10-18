@@ -1,15 +1,15 @@
 package com.suiteg.app.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.suiteg.app.Contenedor
 import com.suiteg.app.pedal.EstadoPedal
 import com.suiteg.app.pedal.nombreTecla
@@ -36,7 +37,7 @@ import kotlinx.coroutines.delay
  * guarda la tecla recibida. No hay ningún keycode de fabricante en el código.
  */
 @Composable
-fun PantallaPedal(c: Contenedor, alAtras: () -> Unit) {
+fun PantallaPedal(c: Contenedor) {
     val mapa by c.mapaTeclas.collectAsState()
     val estado by c.monitorPedal.estado.collectAsState()
     val dispositivos by c.monitorPedal.dispositivos.collectAsState()
@@ -61,64 +62,76 @@ fun PantallaPedal(c: Contenedor, alAtras: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { aprendizaje.cancelar() } }
 
-    Column(Modifier.fillMaxSize()) {
-        Cabecera("Pedal", { aprendizaje.cancelar(); alAtras() })
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-            Seccion("Estado")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    when (val e = estado) {
-                        EstadoPedal.SinConfigurar -> "● Sin configurar: asigna una tecla a una acción."
-                        EstadoPedal.Desconectado -> "○ Desconectado. Enciende el pedal o conéctalo por USB-OTG; se reconoce solo."
-                        is EstadoPedal.Conectado -> "● Conectado: ${e.nombres.joinToString()}"
-                    },
-                    color = if (estado is EstadoPedal.Conectado) Paleta.Conectado else Paleta.Alerta,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text("Dispositivos de teclado detectados: " + (dispositivos.joinToString { it.nombre }.ifEmpty { "ninguno" }), color = Paleta.TextoSuave)
-                BotonContorno("Buscar de nuevo", { c.monitorPedal.refrescar() })
-                Text(
-                    "Funciona con pedales Bluetooth (emparejados en los ajustes de Android) y con cable USB-OTG. " +
-                        "Cada pisada se consume: Android no cambiará el volumen ni hará nada con esas teclas.",
-                    color = Paleta.TextoSuave, style = MaterialTheme.typography.bodySmall,
-                )
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 38.dp, end = 38.dp, top = 37.dp, bottom = 24.dp)) {
+        item {
+            Column(Modifier.widthIn(max = 760.dp)) {
+                EncabezadoPagina("Todo listo para tocar", "Pedal", "Las manos en el instrumento. El control a tus pies.")
+                Tarjeta(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icono(TipoIcono.BLUETOOTH, color = Paleta.OxidoClaro, tamano = 30.dp)
+                        Text(
+                            when (estado) {
+                                is EstadoPedal.Conectado -> "Listo para el siguiente compás"
+                                EstadoPedal.Desconectado -> "Pedal desconectado"
+                                EstadoPedal.SinConfigurar -> "Asigna tu pedal"
+                            },
+                            fontFamily = Serifa, fontSize = 25.sp,
+                        )
+                        Text(
+                            when (val e = estado) {
+                                is EstadoPedal.Conectado -> e.nombres.joinToString()
+                                EstadoPedal.Desconectado -> "Enciende el pedal o conéctalo por USB-OTG: se reconoce solo."
+                                EstadoPedal.SinConfigurar -> "Elige una acción abajo y pisa el pedal para enseñarle la tecla."
+                            },
+                            fontSize = 12.sp, color = Paleta.TextoSuave,
+                        )
+                        Text(
+                            "Teclados detectados: " + dispositivos.joinToString { it.nombre }.ifEmpty { "ninguno" },
+                            fontSize = 11.sp, color = Paleta.TextoSuave,
+                        )
+                        Row { BotonContorno("Buscar de nuevo", { c.monitorPedal.refrescar() }, icono = TipoIcono.BLUETOOTH) }
+                    }
+                }
+                Text("Asignación de controles", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 28.dp, bottom = 12.dp))
             }
-
-            Seccion("Acciones")
-            for (accion in Accion.entries) {
-                val teclas = mapa.teclasDe(accion)
-                val esta = aprendiendo == accion
+        }
+        items(Accion.entries.toList()) { accion ->
+            val teclas = mapa.teclasDe(accion)
+            val esta = aprendiendo == accion
+            Column(Modifier.widthIn(max = 760.dp)) {
                 Row(
-                    Modifier.fillMaxWidth().then(if (esta) Modifier.background(Paleta.CarbonMedio).border(1.dp, Paleta.Oxido) else Modifier)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(accion.etiqueta, style = MaterialTheme.typography.bodyLarge)
+                        Text(accion.etiqueta, fontSize = 14.sp)
                         Text(
                             when {
                                 esta -> "Pisa el pedal ahora…" + (rechazo?.let { "  $it" } ?: "")
                                 teclas.isEmpty() -> "Sin asignar"
                                 else -> teclas.joinToString { nombreTecla(it.keyCode) }
                             },
-                            color = if (esta) Paleta.OxidoClaro else Paleta.TextoSuave, style = MaterialTheme.typography.bodySmall,
+                            color = if (esta) Paleta.OxidoClaro else Paleta.TextoSuave, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp),
                         )
                     }
                     if (esta) {
                         BotonContorno("Cancelar", { aprendizaje.cancelar(); aprendiendo = null })
                     } else {
-                        BotonOxido(if (teclas.isEmpty()) "Asignar" else "Cambiar", { aprendizaje.iniciar(accion); aprendiendo = accion })
-                        if (teclas.isNotEmpty()) {
-                            androidx.compose.foundation.layout.Spacer(Modifier.padding(3.dp))
-                            BotonContorno("Quitar", { c.guardarMapa(c.mapaTeclas.value.quitar(accion)) })
-                        }
+                        if (teclas.isNotEmpty()) BotonTexto("Quitar", { c.guardarMapa(c.mapaTeclas.value.quitar(accion)) })
+                        if (teclas.isEmpty()) BotonOxido("Asignar", { aprendizaje.iniciar(accion); aprendiendo = accion })
+                        else BotonContorno("Cambiar", { aprendizaje.iniciar(accion); aprendiendo = accion }, icono = TipoIcono.CHECK)
                     }
                 }
                 HorizontalDivider(color = Paleta.Linea)
             }
-
-            Seccion("Prueba")
-            ProbarPedal(c)
+        }
+        item {
+            Column(Modifier.widthIn(max = 760.dp)) {
+                Text("Prueba", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 28.dp, bottom = 12.dp))
+                ProbarPedal(c)
+                Spacer(Modifier.padding(8.dp))
+                Franja("Funciona con pedales Bluetooth (emparejados antes en los ajustes de Android) y con cable USB-OTG. Cada pisada se consume: Android no cambiará el volumen ni hará nada con esas teclas.")
+            }
         }
     }
 }
@@ -134,8 +147,8 @@ private fun ProbarPedal(c: Contenedor) {
             delay(1000)
         }
     }
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Pisa el pedal: la acción reconocida aparece aquí.", color = Paleta.TextoSuave)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Pisa el pedal: la acción reconocida aparece aquí.", fontSize = 12.sp, color = Paleta.TextoSuave)
         Text(
             observada?.let { "Última acción: ${it.accion.etiqueta}  (#${it.n})" } ?: "Última acción: —",
             style = MaterialTheme.typography.titleMedium, color = Paleta.OxidoClaro,
@@ -143,7 +156,8 @@ private fun ProbarPedal(c: Contenedor) {
         Text(
             if (r.muestras == 0) "Latencia pedal → pantalla: sin medidas todavía (se miden en el lector)."
             else "Latencia pedal → pantalla (${r.muestras} giros): p50 %.0f ms · p95 %.0f ms · p99 %.0f ms".format(r.p50, r.p95, r.p99),
+            fontSize = 12.sp,
         )
-        BotonContorno("Reiniciar medidas", { c.medidorLatencia.limpiar() })
+        Row { BotonContorno("Reiniciar medidas", { c.medidorLatencia.limpiar() }) }
     }
 }

@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
@@ -29,38 +32,27 @@ import java.io.File
 import kotlin.math.roundToInt
 
 @Composable
-fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
+fun PantallaAjustes(c: Contenedor, alPedal: () -> Unit) {
     val a by c.ajustes.collectAsState()
     val pedal by c.monitorPedal.estado.collectAsState()
 
     /** Cualquier cambio manual pasa el perfil a "Personalizado". */
     fun cambiar(f: (AjustesApp) -> AjustesApp) = c.guardarAjustes(f(a).copy(perfil = PerfilUso.PERSONALIZADO))
 
-    Column(Modifier.fillMaxSize()) {
-        Cabecera("Ajustes", alAtras)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 38.dp, end = 38.dp, top = 37.dp, bottom = 32.dp)) {
+        Column(Modifier.widthIn(max = 760.dp)) {
+            EncabezadoPagina("Todo listo para tocar", "Ajustes", "Un espacio que se adapta a tu forma de tocar.")
 
-            Seccion("Perfil de uso")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Opcion("Ensayo", a.perfil == PerfilUso.ENSAYO, { c.guardarAjustes(Perfiles.aplicar(PerfilUso.ENSAYO, a)) })
-                    Opcion("Concierto", a.perfil == PerfilUso.CONCIERTO, { c.guardarAjustes(Perfiles.aplicar(PerfilUso.CONCIERTO, a)) })
-                    Opcion("Foso oscuro", a.perfil == PerfilUso.FOSO_OSCURO, { c.guardarAjustes(Perfiles.aplicar(PerfilUso.FOSO_OSCURO, a)) })
-                    if (a.perfil == PerfilUso.PERSONALIZADO) Opcion("Personalizado", true, {})
-                }
-                Text(
-                    when (a.perfil) {
-                        PerfilUso.ENSAYO -> "Todo disponible: marcadores, anotaciones, tempo, metrónomo y grabación."
-                        PerfilUso.CONCIERTO -> "Solo lo imprescindible, bloqueo táctil al abrir y pedal con antirrebote más alto."
-                        PerfilUso.FOSO_OSCURO -> "Como concierto, con la partitura invertida para no deslumbrar."
-                        PerfilUso.PERSONALIZADO -> "Combinación propia."
-                    },
-                    color = Paleta.TextoSuave,
-                )
+            Text("Tu forma de tocar", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TarjetaPerfil("Ensayo", "Herramientas a mano", a.perfil == PerfilUso.ENSAYO, Modifier.weight(1f)) { c.guardarAjustes(Perfiles.aplicar(PerfilUso.ENSAYO, a)) }
+                TarjetaPerfil("Concierto", "Solo tú y la partitura", a.perfil == PerfilUso.CONCIERTO, Modifier.weight(1f)) { c.guardarAjustes(Perfiles.aplicar(PerfilUso.CONCIERTO, a)) }
+                TarjetaPerfil("Foso oscuro", "Menos luz, más enfoque", a.perfil == PerfilUso.FOSO_OSCURO, Modifier.weight(1f)) { c.guardarAjustes(Perfiles.aplicar(PerfilUso.FOSO_OSCURO, a)) }
             }
+            if (a.perfil == PerfilUso.PERSONALIZADO) Text("Perfil personalizado: has cambiado ajustes a mano.", fontSize = 11.sp, color = Paleta.TextoSuave, modifier = Modifier.padding(top = 10.dp))
 
-            Seccion("Pedal")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TituloGrupo("Pedal")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     when (val p = pedal) {
                         com.suiteg.app.pedal.EstadoPedal.SinConfigurar -> "Sin configurar"
@@ -74,7 +66,7 @@ fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
             DeslizadorEntero(a.cooldownMs, 0..1000, 50) { v -> cambiar { it.copy(cooldownMs = v) } }
             FilaAjuste("Retroceder cruza a la canción anterior", "Con «Anterior» en la primera vista, abre la canción previa en su última vista.", a.cruzarAlRetroceder) { v -> cambiar { it.copy(cruzarAlRetroceder = v) } }
 
-            Seccion("Funciones")
+            TituloGrupo("Funciones")
             FilaAjuste("Puntos de giro", "El pedal avanza entre los puntos que marques en lugar de página a página.", a.puntosGiro) { v -> cambiar { it.copy(puntosGiro = v) } }
             FilaAjuste("Marcadores de ensayo", "Saltar a una sección con nombre y repetirla.", a.marcadores) { v -> cambiar { it.copy(marcadores = v) } }
             FilaAjuste("Setlists", "Agrupar partituras y pasar a la siguiente con el pedal.", a.setlists) { v -> cambiar { it.copy(setlists = v) } }
@@ -85,8 +77,8 @@ fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
             FilaAjuste("Metrónomo", null, a.metronomo) { v -> cambiar { it.copy(metronomo = v) } }
             FilaAjuste("Grabación de audio", "Para escucharte después. Pide permiso de micrófono al usarla.", a.grabacion) { v -> cambiar { it.copy(grabacion = v) } }
 
-            Seccion("Visualización")
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TituloGrupo("Visualización")
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Inversión de colores (foso oscuro)")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Opcion("Ninguna", a.inversion == ModoInversion.NINGUNA, { cambiar { it.copy(inversion = ModoInversion.NINGUNA) } })
@@ -105,13 +97,13 @@ fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
             FilaAjuste("Mostrar latencia del pedal", "Muestra p50/p95/p99 del pedal al fotograma.", a.mostrarLatencia) { v -> cambiar { it.copy(mostrarLatencia = v) } }
 
             if (a.anotaciones) {
-                Seccion("Anotaciones")
+                TituloGrupo("Anotaciones")
                 FilaAjuste("Dibujar también con el dedo", "Por defecto solo dibuja el lápiz y el dedo hace zoom y desplazamiento.", a.dedoDibuja) { v -> cambiar { it.copy(dedoDibuja = v) } }
                 FilaAjuste("Rechazo de palma", null, a.rechazoPalma) { v -> cambiar { it.copy(rechazoPalma = v) } }
             }
 
             if (a.modoConcierto) {
-                Seccion("Modo concierto")
+                TituloGrupo("Modo concierto")
                 FilaAjuste("Bloquear al abrir una partitura", null, a.bloqueoAlAbrir) { v -> cambiar { it.copy(bloqueoAlAbrir = v) } }
                 FilaAjuste("Bloqueo máximo (fijar pantalla)", "Usa la fijación de pantalla de Android: bloquea también Inicio y Recientes. El sistema mostrará su propio aviso.", a.bloqueoMaximo) { v -> cambiar { it.copy(bloqueoMaximo = v) } }
                 Etiqueta("Mantener pulsada la esquina inferior derecha ${a.desbloqueoMs / 1000.0} s para desbloquear")
@@ -119,26 +111,26 @@ fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
             }
 
             if (a.avanceTempo) {
-                Seccion("Avance por tempo")
+                TituloGrupo("Avance por tempo")
                 Etiqueta("Aviso antes de cada giro: ${a.avisoGiroMs / 1000.0} s")
                 DeslizadorEntero(a.avisoGiroMs, 500..6000, 250) { v -> cambiar { it.copy(avisoGiroMs = v) } }
                 Etiqueta("Paso de corrección con el pedal: ${a.pasoVelocidadPct} %")
                 DeslizadorEntero(a.pasoVelocidadPct, 1..15, 1) { v -> cambiar { it.copy(pasoVelocidadPct = v) } }
             }
             if (a.metronomo) {
-                Seccion("Metrónomo")
+                TituloGrupo("Metrónomo")
                 Etiqueta("Volumen: ${(a.volumenMetronomo * 100).toInt()} %")
                 Slider(
                     value = a.volumenMetronomo, onValueChange = { v -> cambiar { it.copy(volumenMetronomo = v) } },
-                    modifier = Modifier.padding(horizontal = 16.dp), colors = coloresDeslizador(),
+                    modifier = Modifier, colors = coloresDeslizador(),
                 )
             }
             if (a.grabacion) {
-                Seccion("Grabación")
+                TituloGrupo("Grabación")
                 FilaAjuste("Anotar los giros de página durante la grabación", "Permite saltar a cada página al escuchar.", a.grabarMarcasGiro) { v -> cambiar { it.copy(grabarMarcasGiro = v) } }
             }
 
-            Seccion("Diagnóstico")
+            TituloGrupo("Diagnóstico")
             val ruta = remember { File(c.app.filesDir, SuiteGApp.ARCHIVO_FALLOS) }
             Etiqueta(if (ruta.exists() && ruta.length() > 0) "Hay un registro de errores en: ${ruta.absolutePath}" else "Sin errores registrados.")
         }
@@ -146,7 +138,7 @@ fun PantallaAjustes(c: Contenedor, alAtras: () -> Unit, alPedal: () -> Unit) {
 }
 
 @Composable
-private fun Etiqueta(texto: String) = Text(texto, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), color = Paleta.TextoSuave)
+private fun Etiqueta(texto: String) = Text(texto, Modifier.fillMaxWidth().padding(vertical = 6.dp), color = Paleta.TextoSuave)
 
 @Composable
 private fun coloresDeslizador() = SliderDefaults.colors(
@@ -161,7 +153,20 @@ private fun DeslizadorEntero(valor: Int, rango: IntRange, paso: Int, alCambiar: 
         onValueChange = { alCambiar(((it / paso).roundToInt() * paso).coerceIn(rango.first, rango.last)) },
         valueRange = rango.first.toFloat()..rango.last.toFloat(),
         steps = ((rango.last - rango.first) / paso - 1).coerceAtLeast(0),
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier,
         colors = coloresDeslizador(),
     )
+}
+
+@Composable
+private fun TarjetaPerfil(nombre: String, descripcion: String, elegido: Boolean, modifier: Modifier, alPulsar: () -> Unit) {
+    Tarjeta(modifier, seleccionada = elegido, alPulsar = alPulsar) {
+        Column(Modifier.fillMaxWidth().padding(19.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(nombre, Modifier.weight(1f), fontSize = 14.sp, color = if (elegido) Paleta.SeleccionTexto else Paleta.Texto)
+                if (elegido) Icono(TipoIcono.CHECK, color = Paleta.SeleccionTexto, tamano = 14.dp)
+            }
+            Text(descripcion, fontSize = 10.sp, color = Paleta.TextoSuave)
+        }
+    }
 }

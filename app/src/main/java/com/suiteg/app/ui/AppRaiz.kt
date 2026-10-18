@@ -11,8 +11,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.suiteg.app.Contenedor
 import com.suiteg.app.datos.ResultadoImportacion
@@ -22,33 +23,36 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private sealed interface Pantalla {
-    data object Biblioteca : Pantalla
-    data object Setlists : Pantalla
-    data class DetalleSetlist(val id: Long) : Pantalla
-    data object Ajustes : Pantalla
-    data object Pedal : Pantalla
-    data object Grabaciones : Pantalla
-    data class Lector(val hash: String, val setlistId: Long?, val indice: Int, val reanudar: SesionGuardada? = null) : Pantalla
-}
+/** Lo que hay que abrir en el lector. */
+private data class AperturaLector(val hash: String, val setlistId: Long?, val indice: Int, val reanudar: SesionGuardada? = null)
 
-/** Raíz de la interfaz: una pila de pantallas sencilla (sin librería de navegación). */
+/**
+ * Raíz de la interfaz. Las cinco secciones principales viven dentro del armazón con barra lateral; el lector ocupa
+ * toda la pantalla por encima de ellas, y al salir se vuelve a la sección en la que se estaba.
+ */
 @Composable
 fun AppRaiz(c: Contenedor, ventana: ControlVentana, pdfEntrante: StateFlow<Uri?>, arranqueEnFrio: Boolean) {
-    val pila = remember { mutableStateListOf<Pantalla>(Pantalla.Biblioteca) }
-    val actual = pila.last()
+    var seccion by remember { mutableStateOf(Seccion.BIBLIOTECA) }
+    var setlistAbierto by remember { mutableStateOf<Long?>(null) }
+    var lector by remember { mutableStateOf<AperturaLector?>(null) }
     val ultimaSesion by c.ajustesRepo.ultimaSesion.collectAsState(null)
+    val ajustes by c.ajustes.collectAsState()
 
-    fun ir(p: Pantalla) { pila.add(p) }
-    fun atras() { if (pila.size > 1) pila.removeAt(pila.lastIndex) }
+    // Atrás: de un setlist abierto a la lista; de cualquier sección a la biblioteca.
+    BackHandler(enabled = lector == null && (setlistAbierto != null || seccion != Seccion.BIBLIOTECA)) {
+        if (setlistAbierto != null) setlistAbierto = null else seccion = Seccion.BIBLIOTECA
+    }
 
-    BackHandler(enabled = pila.size > 1 && actual !is Pantalla.Lector) { atras() }
+    // Si se desactiva una función cuya sección está abierta, se vuelve a la biblioteca.
+    LaunchedEffect(ajustes.setlists, ajustes.grabacion, seccion) {
+        if ((seccion == Seccion.SETLISTS && !ajustes.setlists) || (seccion == Seccion.GRABACIONES && !ajustes.grabacion)) seccion = Seccion.BIBLIOTECA
+    }
 
     // Si la app murió con el lector abierto (o con el modo concierto activo), vuelve exactamente ahí.
     LaunchedEffect(Unit) {
         if (!arranqueEnFrio) return@LaunchedEffect
         c.ajustesRepo.sesionInterrumpida.first()?.let { s ->
-            if (c.repoDocumentos.obtener(s.hash) != null) ir(Pantalla.Lector(s.hash, s.setlistId.takeIf { it > 0 }, s.indiceSetlist, s))
+            if (c.repoDocumentos.obtener(s.hash) != null) lector = AperturaLector(s.hash, s.setlistId.takeIf { it > 0 }, s.indiceSetlist, s)
         }
     }
 
@@ -57,30 +61,16 @@ fun AppRaiz(c: Contenedor, ventana: ControlVentana, pdfEntrante: StateFlow<Uri?>
     LaunchedEffect(entrante) {
         val uri = entrante ?: return@LaunchedEffect
         when (val r = c.importador.importar(uri)) {
-            is ResultadoImportacion.Importado -> ir(Pantalla.Lector(r.documento.hash, null, 0))
-            is ResultadoImportacion.YaExistia -> ir(Pantalla.Lector(r.documento.hash, null, 0))
+            is ResultadoImportacion.Importado -> lector = AperturaLector(r.documento.hash, null, 0)
+            is ResultadoImportacion.YaExistia -> lector = AperturaLector(r.documento.hash, null, 0)
             is ResultadoImportacion.Fallo -> Unit
         }
     }
 
     Box(Modifier.fillMaxSize().background(Paleta.Carbon)) {
-        when (actual) {
-            Pantalla.Biblioteca -> PantallaBiblioteca(
-                c, ultimaSesion,
-                alAbrir = { ir(Pantalla.Lector(it, null, 0)) },
-                alContinuar = { ir(Pantalla.Lector(it.hash, it.setlistId.takeIf { id -> id > 0 }, it.indiceSetlist, it)) },
-                alSetlists = { ir(Pantalla.Setlists) },
-                alGrabaciones = { ir(Pantalla.Grabaciones) },
-                alAjustes = { ir(Pantalla.Ajustes) },
-            )
-            Pantalla.Setlists -> PantallaSetlists(c, ::atras) { ir(Pantalla.DetalleSetlist(it)) }
-            is Pantalla.DetalleSetlist -> PantallaDetalleSetlist(c, actual.id, ::atras) { id, indice ->
-                scopeAbrirSetlist(c, id, indice) { hash -> ir(Pantalla.Lector(hash, id, indice)) }
-            }
-            Pantalla.Ajustes -> PantallaAjustes(c, ::atras) { ir(Pantalla.Pedal) }
-            Pantalla.Pedal -> PantallaPedal(c, ::atras)
-            Pantalla.Grabaciones -> PantallaGrabaciones(c, ::atras)
-            is Pantalla.Lector -> key(actual) {
+        val abierto = lector
+        if (abierto != null) {
+            key(abierto) {
                 val sesion = remember { SesionLectura(c) }
                 DisposableEffect(sesion) {
                     c.sesion = sesion
@@ -90,16 +80,36 @@ fun AppRaiz(c: Contenedor, ventana: ControlVentana, pdfEntrante: StateFlow<Uri?>
                     }
                 }
                 LaunchedEffect(sesion) {
-                    if (actual.reanudar != null) sesion.reanudar(actual.reanudar) else sesion.abrir(actual.hash, actual.setlistId, actual.indice)
+                    if (abierto.reanudar != null) sesion.reanudar(abierto.reanudar) else sesion.abrir(abierto.hash, abierto.setlistId, abierto.indice)
                 }
-                PantallaLector(c, sesion, ventana, ::atras)
+                PantallaLector(c, sesion, ventana) { lector = null }
+            }
+        } else {
+            ShellApp(c, seccion, { seccion = it; setlistAbierto = null }) {
+                when (seccion) {
+                    Seccion.BIBLIOTECA -> PantallaBiblioteca(
+                        c, ultimaSesion,
+                        alAbrir = { lector = AperturaLector(it, null, 0) },
+                        alContinuar = { lector = AperturaLector(it.hash, it.setlistId.takeIf { id -> id > 0 }, it.indiceSetlist, it) },
+                    )
+                    Seccion.SETLISTS -> {
+                        val id = setlistAbierto
+                        if (id == null) PantallaSetlists(c) { setlistAbierto = it }
+                        else PantallaDetalleSetlist(c, id, { setlistAbierto = null }) { setlist, indice ->
+                            abrirDeSetlist(c, setlist, indice) { hash -> lector = AperturaLector(hash, setlist, indice) }
+                        }
+                    }
+                    Seccion.GRABACIONES -> PantallaGrabaciones(c)
+                    Seccion.PEDAL -> PantallaPedal(c)
+                    Seccion.AJUSTES -> PantallaAjustes(c) { seccion = Seccion.PEDAL }
+                }
             }
         }
     }
 }
 
 /** Busca el hash de la canción [indice] del setlist para abrirla. */
-private fun scopeAbrirSetlist(c: Contenedor, id: Long, indice: Int, abrir: (String) -> Unit) {
+private fun abrirDeSetlist(c: Contenedor, id: Long, indice: Int, abrir: (String) -> Unit) {
     c.scope.launch {
         val s = c.repoSetlists.obtener(id) ?: return@launch
         s.items.getOrNull(indice)?.let { abrir(it.hash) }
