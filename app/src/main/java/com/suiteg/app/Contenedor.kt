@@ -14,6 +14,7 @@ import com.suiteg.app.datos.RepoPartitura
 import com.suiteg.app.datos.RepoSetlists
 import com.suiteg.app.datos.RepoTrazos
 import com.suiteg.app.lector.SesionLectura
+import com.suiteg.app.pdf.Miniaturas
 import com.suiteg.app.pedal.MonitorPedal
 import com.suiteg.modelo.AjustesApp
 import com.suiteg.modelo.MedidorLatencia
@@ -59,6 +60,7 @@ class Contenedor(val app: Application) {
 
     val validador = ClienteValidador(app)
     val importador = ImportadorPdf(app, bd.documentos(), validador)
+    val miniaturas = Miniaturas(java.io.File(app.filesDir, "miniaturas"))
 
     val monitorPedal = MonitorPedal(app)
     val medidorLatencia = MedidorLatencia()

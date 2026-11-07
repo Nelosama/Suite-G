@@ -3,6 +3,7 @@ package com.suiteg.app.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -38,7 +40,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +52,8 @@ import com.suiteg.app.Contenedor
 import com.suiteg.app.datos.DocumentoE
 import com.suiteg.app.datos.ResultadoImportacion
 import com.suiteg.app.datos.SesionGuardada
+import com.suiteg.app.pdf.Miniaturas
+import com.suiteg.modelo.EstadoDocumento
 import kotlinx.coroutines.launch
 
 private enum class Orden { RECIENTES, TITULO }
@@ -141,7 +148,7 @@ fun PantallaBiblioteca(
         } else if (cuadricula) {
             items(visibles.chunked(3), key = { fila -> fila.first().hash }) { fila ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    for (d in fila) Box(Modifier.weight(1f)) { TarjetaDocumento(d, ajustes.notas, { alAbrir(d.hash) }, { aEditarNotas = d }, { aEliminar = d }) }
+                    for (d in fila) Box(Modifier.weight(1f)) { TarjetaDocumento(d, ajustes.notas, c.miniaturas, { alAbrir(d.hash) }, { aEditarNotas = d }, { aEliminar = d }) }
                     repeat(3 - fila.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
@@ -156,7 +163,7 @@ fun PantallaBiblioteca(
                 HorizontalDivider(color = Paleta.Linea)
             }
             items(visibles, key = { it.hash }) { d ->
-                FilaDocumento(d, ajustes.notas, { alAbrir(d.hash) }, { aEditarNotas = d }, { aEliminar = d })
+                FilaDocumento(d, ajustes.notas, c.miniaturas, { alAbrir(d.hash) }, { aEditarNotas = d }, { aEliminar = d })
                 HorizontalDivider(color = Color(0xFF2C2F27))
             }
         }
@@ -175,7 +182,7 @@ fun PantallaBiblioteca(
     aEliminar?.let { d ->
         DialogoConfirmar(
             "Eliminar partitura", "«${d.titulo}» se quitará de la biblioteca y de los setlists, junto con sus anotaciones, giros y marcadores.",
-            "Eliminar", { scope.launch { c.repoDocumentos.eliminar(d.hash) }; aEliminar = null }, { aEliminar = null },
+            "Eliminar", { scope.launch { c.repoDocumentos.eliminar(d.hash) }; c.miniaturas.borrar(d.hash); aEliminar = null }, { aEliminar = null },
         )
     }
     aEditarNotas?.let { d ->
@@ -281,15 +288,34 @@ private fun IconoDocumento() {
     }
 }
 
+/**
+ * Primera página de la partitura como miniatura. Mientras se genera (o si el PDF no se puede leer) se muestra
+ * el icono de siempre, así que la lista nunca espera a una miniatura.
+ */
 @Composable
-private fun FilaDocumento(d: DocumentoE, mostrarNotas: Boolean, alAbrir: () -> Unit, alNotas: () -> Unit, alEliminar: () -> Unit) {
+private fun MiniaturaDocumento(d: DocumentoE, miniaturas: Miniaturas, modifier: Modifier) {
+    val imagen by produceState<ImageBitmap?>(initialValue = null, d.hash, d.estado) {
+        value = if (d.estado == EstadoDocumento.OK.name) miniaturas.obtener(d.hash, d.rutaInterna)?.asImageBitmap() else null
+    }
+    val img = imagen
+    if (img != null) {
+        Image(img, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier.clip(Formas.Pequena).border(1.dp, Color(0xFF3C4033), Formas.Pequena))
+    } else {
+        Box(modifier.background(Color(0xFF282C22), Formas.Pequena).border(1.dp, Color(0xFF3C4033), Formas.Pequena), contentAlignment = Alignment.Center) {
+            Icono(TipoIcono.ARCHIVO, color = Color(0xFFA7AF94), tamano = 17.dp)
+        }
+    }
+}
+
+@Composable
+private fun FilaDocumento(d: DocumentoE, mostrarNotas: Boolean, miniaturas: Miniaturas, alAbrir: () -> Unit, alNotas: () -> Unit, alEliminar: () -> Unit) {
     val (sub, colorSub) = detalle(d)
     Row(
         Modifier.fillMaxWidth().clickable(onClick = alAbrir).padding(horizontal = 13.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp),
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            IconoDocumento()
+            MiniaturaDocumento(d, miniaturas, Modifier.size(width = 34.dp, height = 44.dp))
             Column {
                 Text(d.titulo, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(if (mostrarNotas && d.notas.isNotBlank()) d.notas else sub, fontSize = 10.sp, color = if (mostrarNotas && d.notas.isNotBlank()) Paleta.OxidoClaro else colorSub, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
@@ -305,12 +331,12 @@ private fun FilaDocumento(d: DocumentoE, mostrarNotas: Boolean, alAbrir: () -> U
 }
 
 @Composable
-private fun TarjetaDocumento(d: DocumentoE, mostrarNotas: Boolean, alAbrir: () -> Unit, alNotas: () -> Unit, alEliminar: () -> Unit) {
+private fun TarjetaDocumento(d: DocumentoE, mostrarNotas: Boolean, miniaturas: Miniaturas, alAbrir: () -> Unit, alNotas: () -> Unit, alEliminar: () -> Unit) {
     val (sub, colorSub) = detalle(d)
     Tarjeta(Modifier.fillMaxWidth(), alPulsar = alAbrir) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                IconoDocumento()
+                MiniaturaDocumento(d, miniaturas, Modifier.size(width = 52.dp, height = 68.dp))
                 Column {
                     Text(d.titulo, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(sub, fontSize = 10.sp, color = colorSub, modifier = Modifier.padding(top = 6.dp))

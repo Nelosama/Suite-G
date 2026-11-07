@@ -5,8 +5,11 @@ import android.hardware.input.InputManager
 import android.os.Handler
 import android.os.Looper
 import android.view.InputDevice
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class DispositivoEntrada(val id: Int, val descriptor: String, val nombre: String)
@@ -19,6 +22,22 @@ sealed interface EstadoPedal {
     data object Desconectado : EstadoPedal
 
     data class Conectado(val nombres: List<String>) : EstadoPedal
+}
+
+/** Cambio real de conexión del pedal, para avisar al usuario (p. ej. en pleno concierto). */
+sealed interface EventoPedal {
+    data class Reconectado(val nombres: List<String>) : EventoPedal
+    data object Desconectado : EventoPedal
+}
+
+/**
+ * Qué avisar al pasar de [anterior] a [nuevo]. Solo cuenta el paso entre conectado y desconectado: la primera
+ * lectura al arrancar (sin configurar → conectado) no es un evento. Función pura para poder probarla en JVM.
+ */
+fun eventoTransicion(anterior: EstadoPedal, nuevo: EstadoPedal): EventoPedal? = when {
+    anterior == EstadoPedal.Desconectado && nuevo is EstadoPedal.Conectado -> EventoPedal.Reconectado(nuevo.nombres)
+    anterior is EstadoPedal.Conectado && nuevo == EstadoPedal.Desconectado -> EventoPedal.Desconectado
+    else -> null
 }
 
 /**
@@ -38,6 +57,10 @@ class MonitorPedal(contexto: Context) {
 
     private val _estado = MutableStateFlow<EstadoPedal>(EstadoPedal.SinConfigurar)
     val estado: StateFlow<EstadoPedal> = _estado.asStateFlow()
+
+    private val _eventos = MutableSharedFlow<EventoPedal>(extraBufferCapacity = 8)
+    /** Avisos de reconexión y desconexión. Si nadie escucha, se descartan sin bloquear. */
+    val eventos: SharedFlow<EventoPedal> = _eventos.asSharedFlow()
 
     private val oyente = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = refrescar()
@@ -62,13 +85,16 @@ class MonitorPedal(contexto: Context) {
     }
 
     private fun recalcular() {
-        _estado.value = when {
+        val anterior = _estado.value
+        val nuevo = when {
             descriptores.isEmpty() -> EstadoPedal.SinConfigurar
             else -> {
                 val activos = _dispositivos.value.filter { it.descriptor in descriptores }
                 if (activos.isEmpty()) EstadoPedal.Desconectado else EstadoPedal.Conectado(activos.map { it.nombre }.distinct())
             }
         }
+        _estado.value = nuevo
+        eventoTransicion(anterior, nuevo)?.let { _eventos.tryEmit(it) }
     }
 
     private fun listar(): List<DispositivoEntrada> = InputDevice.getDeviceIds().toList().mapNotNull { id ->
