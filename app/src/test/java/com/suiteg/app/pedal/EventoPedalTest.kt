@@ -3,6 +3,7 @@ package com.suiteg.app.pedal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class EventoPedalTest {
 
@@ -33,5 +34,25 @@ class EventoPedalTest {
     fun `cambiar de un pedal conectado a otro distinto no cuenta como desconexion`() {
         // Ambos estados son Conectado: el paso entre dispositivos se refleja en el indicador, no en el aviso.
         assertNull(eventoTransicion(EstadoPedal.Conectado(listOf("A")), EstadoPedal.Conectado(listOf("B"))))
+    }
+
+    @Test
+    fun `el aviso de reconexion nombra el pedal y es breve`() {
+        val aviso = avisoDe(EventoPedal.Reconectado(listOf("Pedal BT")))
+        assertEquals("Pedal reconectado: Pedal BT", aviso.texto)
+        assertEquals(DURACION_AVISO_RECONEXION_MS, aviso.duracionMs)
+        assertEquals(false, aviso.esAlerta)
+    }
+
+    @Test
+    fun `el aviso de reconexion sin nombres no deja dos puntos colgando`() {
+        assertEquals("Pedal reconectado", avisoDe(EventoPedal.Reconectado(emptyList())).texto)
+    }
+
+    @Test
+    fun `el aviso de desconexion es una alerta y dura mas`() {
+        val aviso = avisoDe(EventoPedal.Desconectado)
+        assertEquals(true, aviso.esAlerta)
+        assertTrue(aviso.duracionMs > DURACION_AVISO_RECONEXION_MS)
     }
 }

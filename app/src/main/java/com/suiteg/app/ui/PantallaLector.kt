@@ -53,7 +53,9 @@ import com.suiteg.app.lector.ContenedorLector
 import com.suiteg.app.lector.EstadoLectorUi
 import com.suiteg.app.lector.ModoEdicion
 import com.suiteg.app.lector.SesionLectura
+import com.suiteg.app.pedal.AvisoPedal
 import com.suiteg.app.pedal.EstadoPedal
+import com.suiteg.app.pedal.avisoDe
 import com.suiteg.modelo.AjusteVista
 import com.suiteg.modelo.AjustesApp
 import com.suiteg.modelo.Herramienta
@@ -67,6 +69,7 @@ import com.suiteg.navegacion.FaseLector
 import com.suiteg.navegacion.entrada.Accion
 import com.suiteg.tempo.EstadoTempo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 /** Lo que el lector necesita de la ventana (lo implementa MainActivity). */
 interface ControlVentana {
@@ -110,6 +113,17 @@ fun PantallaLector(c: Contenedor, sesion: SesionLectura, ventana: ControlVentana
     }
     DisposableEffect(sesion) { onDispose { sesion.separar() } }
 
+    // Aviso breve de reconexión/desconexión del pedal. collectLatest: si llega otro evento, sustituye al anterior.
+    var avisoPedal by remember { mutableStateOf<AvisoPedal?>(null) }
+    LaunchedEffect(c.monitorPedal) {
+        c.monitorPedal.eventos.collectLatest { e ->
+            val aviso = avisoDe(e)
+            avisoPedal = aviso
+            delay(aviso.duracionMs)
+            avisoPedal = null
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(Color(0xFF30322E))) {
         CabeceraLector(ui, pedal, grab, a, c, alSalir, { guardarVisual(c, a.copy(inversion = if (a.inversion == ModoInversion.NINGUNA) ModoInversion.TODO else ModoInversion.NINGUNA)) })
         Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -135,6 +149,7 @@ fun PantallaLector(c: Contenedor, sesion: SesionLectura, ventana: ControlVentana
             }
 
             if (ui.fase == FaseLector.ERROR) PanelError(ui, sesion)
+            avisoPedal?.let { AvisoPedalLector(it, Modifier.align(Alignment.TopEnd).padding(top = 44.dp, end = 12.dp)) }
             if (ui.cargando) Text("Abriendo…", Modifier.align(Alignment.Center).background(Paleta.CarbonClaro, Formas.Media).padding(16.dp))
 
             if (panel && !ui.bloqueado) {
@@ -255,6 +270,23 @@ private fun AvisoGiro(ui: EstadoLectorUi, c: Contenedor) {
             (if (ui.avisoGiroEsFin) "FIN DE LA PIEZA en " else "GIRO en ") + "%.1f s".format(restante / 1000.0),
             Modifier.align(Alignment.Center), color = Paleta.TextoSobreOxido, style = MaterialTheme.typography.titleMedium,
         )
+    }
+}
+
+/**
+ * Aviso del pedal en una esquina, sobre la partitura. No tiene `clickable` ni ningún otro manejador de toques:
+ * los toques lo atraviesan hasta la vista de la partitura (y su superficie de bloqueo en modo concierto), y el
+ * pedal no se ve afectado porque entra por `MainActivity.dispatchKeyEvent`. Desaparece solo.
+ */
+@Composable
+private fun AvisoPedalLector(aviso: AvisoPedal, modifier: Modifier) {
+    val borde = if (aviso.esAlerta) Paleta.Alerta else Paleta.Linea
+    Row(
+        modifier.background(Color(0xE6191B17), Formas.Media).border(1.dp, borde, Formas.Media).padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icono(TipoIcono.PEDAL, color = if (aviso.esAlerta) Paleta.Alerta else Paleta.TextoSuave, tamano = 14.dp)
+        Text(aviso.texto, fontSize = 12.sp, color = if (aviso.esAlerta) Paleta.Alerta else Paleta.Texto, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

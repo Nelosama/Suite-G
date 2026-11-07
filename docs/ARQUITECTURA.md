@@ -40,6 +40,27 @@ binario compacto (`CodecTrazos`) indexados por el **SHA-256** del archivo.
 de la ventana (página + márgenes) con `transform` = escala + traslación. Se cachean 3 imágenes (actual, siguiente, anterior) con
 presupuesto en bytes; nunca se llama a `recycle()` sobre una imagen expulsada (podría estar en pantalla).
 
+## Miniaturas de la biblioteca
+`pdf/Miniaturas` rasteriza la **primera página** de cada partitura con el mismo `PdfRendererMotor` que el lector (no hay motor
+aparte), una sola a la vez (`Mutex`), y la guarda como PNG en `filesDir/miniaturas/<sha256>.png`:
+- tamaño calculado en `core:modelo` (`CalculoMiniatura`: 240 px de ancho, alto proporcional y como mucho 3× el ancho);
+- caché en memoria LRU de 8 MB; la biblioteca toma su valor inicial de esa caché de forma síncrona para que el icono no parpadee al hacer scroll;
+- cualquier error (PDF dañado, error nativo, `OutOfMemoryError`) devuelve null y se muestra el icono genérico; esa partitura no se reintenta hasta el siguiente arranque;
+- se escribe a un `.tmp` y se renombra; al eliminar una partitura se borra su miniatura, y al abrir la biblioteca se borran temporales y miniaturas sin partitura (`CalculoMiniatura.huerfanos`).
+
+## Eventos del pedal
+`MonitorPedal` escucha `InputManager.InputDeviceListener` y calcula `estado` (`SinConfigurar`, `Desconectado`, `Conectado`) a partir de
+los descriptores con teclas asignadas. Cada cambio pasa por la función pura `eventoTransicion(anterior, nuevo)`: solo el paso
+conectado ↔ desconectado produce un `EventoPedal` (`Reconectado` / `Desconectado`), publicado en el `SharedFlow` `eventos`
+(`tryEmit`, nunca bloquea). `PantallaLector` lo recoge con `collectLatest`, lo traduce con `avisoDe` (texto y duración: 3 s
+reconexión, 5 s desconexión) y muestra un aviso en la esquina superior derecha sin manejadores de toque: no tapa la barra de
+giro, no pide interacción y no afecta al pedal, que sigue entrando por `dispatchKeyEvent`.
+
+```
+InputManager ─▶ MonitorPedal.recalcular ─▶ estado (StateFlow) ─▶ indicador ●/○ de la cabecera
+                                     └──▶ eventoTransicion ─▶ eventos (SharedFlow) ─▶ avisoDe ─▶ aviso temporal en el lector
+```
+
 ## Procesos
 - principal: interfaz y datos;
 - `:grabacion`: `MediaRecorder` en un servicio de primer plano;

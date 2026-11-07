@@ -26,6 +26,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +41,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -54,6 +54,7 @@ import com.suiteg.app.datos.ResultadoImportacion
 import com.suiteg.app.datos.SesionGuardada
 import com.suiteg.app.pdf.Miniaturas
 import com.suiteg.modelo.EstadoDocumento
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private enum class Orden { RECIENTES, TITULO }
@@ -97,6 +98,13 @@ fun PantallaBiblioteca(
         .filter { filtro.isBlank() || it.titulo.contains(filtro, ignoreCase = true) }
         .sortedWith(if (orden == Orden.TITULO) compareBy { it.titulo.lowercase() } else compareByDescending { it.importadoEn })
     val retomar = ultimaSesion?.let { s -> docs.firstOrNull { it.hash == s.hash } }
+
+    // Limpieza de miniaturas huérfanas con la primera lista REAL de la base de datos (no con la lista vacía
+    // inicial de collectAsState, que borraría todas).
+    LaunchedEffect(Unit) {
+        val vigentes = c.repoDocumentos.todos.first().map { it.hash }.toSet()
+        c.miniaturas.limpiarHuerfanos(vigentes)
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 38.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 37.dp, bottom = 16.dp)) {
         item {
@@ -182,7 +190,7 @@ fun PantallaBiblioteca(
     aEliminar?.let { d ->
         DialogoConfirmar(
             "Eliminar partitura", "«${d.titulo}» se quitará de la biblioteca y de los setlists, junto con sus anotaciones, giros y marcadores.",
-            "Eliminar", { scope.launch { c.repoDocumentos.eliminar(d.hash) }; c.miniaturas.borrar(d.hash); aEliminar = null }, { aEliminar = null },
+            "Eliminar", { scope.launch { c.repoDocumentos.eliminar(d.hash); c.miniaturas.borrar(d.hash) }; aEliminar = null }, { aEliminar = null },
         )
     }
     aEditarNotas?.let { d ->
@@ -281,21 +289,22 @@ private fun detalle(d: DocumentoE): Pair<String, Color> = when (d.estado) {
     else -> "PDF en este dispositivo" to Color(0xFF7F8773)
 }
 
-@Composable
-private fun IconoDocumento() {
-    Box(Modifier.size(width = 34.dp, height = 40.dp).background(Color(0xFF282C22), Formas.Pequena).border(1.dp, Color(0xFF3C4033), Formas.Pequena), contentAlignment = Alignment.Center) {
-        Icono(TipoIcono.ARCHIVO, color = Color(0xFFA7AF94), tamano = 17.dp)
-    }
-}
-
 /**
  * Primera página de la partitura como miniatura. Mientras se genera (o si el PDF no se puede leer) se muestra
  * el icono de siempre, así que la lista nunca espera a una miniatura.
+ *
+ * El valor inicial sale de la caché en memoria de forma síncrona: al hacer scroll, una fila que vuelve a la
+ * pantalla se compone de nuevo y, sin esto, mostraría el icono durante un fotograma antes de la miniatura.
  */
 @Composable
 private fun MiniaturaDocumento(d: DocumentoE, miniaturas: Miniaturas, modifier: Modifier) {
-    val imagen by produceState<ImageBitmap?>(initialValue = null, d.hash, d.estado) {
-        value = if (d.estado == EstadoDocumento.OK.name) miniaturas.obtener(d.hash, d.rutaInterna)?.asImageBitmap() else null
+    val ok = d.estado == EstadoDocumento.OK.name
+    val inicial = remember(d.hash, ok) { if (ok) miniaturas.enMemoria(d.hash)?.asImageBitmap() else null }
+    val imagen by produceState(initialValue = inicial, d.hash, ok) {
+        // produceState conserva el valor anterior al cambiar las claves (p. ej. otra partitura en la misma celda
+        // de la cuadrícula al filtrar): se reinicia para no mostrar la miniatura de otra.
+        value = inicial
+        if (ok && inicial == null) value = miniaturas.obtener(d.hash, d.rutaInterna)?.asImageBitmap()
     }
     val img = imagen
     if (img != null) {
