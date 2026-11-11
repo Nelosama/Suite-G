@@ -4,7 +4,15 @@
 - **R1 Pulsación larga**: ver DECISIONES. Con un solo botón hay que sacrificar latencia.
 - **R2 Varias teclas por pisada** (p. ej. flecha + Enter): el aprendizaje agrupa las recibidas en `ventanaGrupoMs` y las asigna a la misma acción; el procesador deja pasar solo una por ventana.
 - **R3 Teclas del sistema** (Inicio, Encendido, Asistente…): no se pueden consumir; el aprendizaje las rechaza con aviso.
-- **R4 Reconexión**: la reconecta Android, no la app (sin APIs ocultas). La app detecta el dispositivo por su `descriptor` y actualiza el indicador al instante. Muchos pedales se duermen por inactividad y **pierden la primera pisada al despertar**: desactiva el ahorro del pedal.
+- **R4 Pedal dormido y reconexión**: **esto no lo puede corregir la app.** Es un ajuste del pedal o de Android.
+  - Muchos pedales Bluetooth se duermen tras unos minutos sin usarse. La pisada que los despierta **suele perderse**:
+    el pedal la usa para reconectar y no la envía a Android, así que la app nunca la recibe y no puede recuperarla.
+  - Quien reconecta el Bluetooth es Android, no la app: no hay API pública para forzarlo ni para mantener despierto un pedal ajeno.
+  - Lo que sí hace la app: reconocer el pedal por su `descriptor` (la asignación sigue valiendo tras reconectar), cambiar el indicador
+    ●/○ al instante y mostrar un aviso breve de «Pedal desconectado» / «Pedal reconectado» en el lector.
+  - Qué hacer: desactivar el ahorro de energía o el apagado automático **en el pedal** (según el fabricante: interruptor, combinación
+    de botones o su app); si el pedal tiene modo USB, usar USB-OTG en concierto; en Android, revisar los ajustes de ahorro de energía del
+    fabricante de la tablet que afecten al Bluetooth. Antes de tocar, pisa una vez y comprueba que el indicador está en ●.
 - **R5 Teclado en pantalla**: con un teclado físico conectado Android puede no mostrar el teclado virtual al escribir notas; se arregla en Ajustes de Android → teclado físico.
 - **R6 Pocos botones**: tempo (iniciar, más rápido, más lento, resincronizar) pide 4 teclas; usa un pedal de 3–4 botones o asigna solo lo imprescindible.
 

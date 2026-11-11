@@ -40,6 +40,26 @@ fun eventoTransicion(anterior: EstadoPedal, nuevo: EstadoPedal): EventoPedal? = 
     else -> null
 }
 
+/** Texto y duración del aviso breve que el lector muestra al llegar un [EventoPedal]. */
+data class AvisoPedal(val texto: String, val duracionMs: Long, val esAlerta: Boolean)
+
+/**
+ * Aviso para [evento]. La desconexión dura más y se marca como alerta porque, en directo, significa que la
+ * próxima pisada no hará nada; el indicador de la cabecera sigue mostrando el estado de forma permanente.
+ * Función pura para poder probarla en JVM.
+ */
+fun avisoDe(evento: EventoPedal): AvisoPedal = when (evento) {
+    is EventoPedal.Reconectado -> AvisoPedal(
+        texto = "Pedal reconectado" + (evento.nombres.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ") ?: ""),
+        duracionMs = DURACION_AVISO_RECONEXION_MS,
+        esAlerta = false,
+    )
+    EventoPedal.Desconectado -> AvisoPedal("Pedal desconectado", DURACION_AVISO_DESCONEXION_MS, esAlerta = true)
+}
+
+const val DURACION_AVISO_RECONEXION_MS = 3_000L
+const val DURACION_AVISO_DESCONEXION_MS = 5_000L
+
 /**
  * Vigila la conexión del pedal (Bluetooth o USB-OTG: para Android son lo mismo, un dispositivo de teclado).
  *
